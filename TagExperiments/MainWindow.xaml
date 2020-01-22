@@ -1,0 +1,27 @@
+﻿<Window x:Class="MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TagExperiments"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="415.447" Width="400.745">
+    <Grid>
+        <Button x:Name="loadFileButton" Content="Load File" HorizontalAlignment="Right" Margin="0,10,10,0" VerticalAlignment="Top" Width="75" RenderTransformOrigin="-0.423,0.379"/>
+        <DataGrid x:Name="trackInfoGrid" Margin="10,40,10,29" IsReadOnly="True" ItemsSource="{Binding}" AutoGenerateColumns="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Binding="{Binding Name}" ClipboardContentBinding="{x:Null}" Header="Tag"/>
+                <DataGridTextColumn Binding="{Binding Value}" ClipboardContentBinding="{x:Null}" Header="Value"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <Button x:Name="loadDirButton" Content="Load Dir" HorizontalAlignment="Right" Margin="0,10,90,0" VerticalAlignment="Top" Width="75"/>
+        <Button x:Name="importDirButton" Content="Import Library" HorizontalAlignment="Right" Margin="0,10,170,0" VerticalAlignment="Top" Width="100"/>
+        <StatusBar Height="24" Margin="0,345,0,0" VerticalAlignment="Bottom" Width="393">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusBarText">Ready.</TextBlock>
+            </StatusBarItem>
+        </StatusBar>
+
+
+    </Grid>
+</Window>
