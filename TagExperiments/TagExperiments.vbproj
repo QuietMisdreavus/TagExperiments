@@ -208,5 +208,8 @@
   <ItemGroup>
     <Resource Include="Resources\TagExperiments.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="LICENSE" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>
