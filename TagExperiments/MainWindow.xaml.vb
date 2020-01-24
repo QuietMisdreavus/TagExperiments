@@ -40,7 +40,7 @@ Class MainWindow
             ProgressCount += 1
             StatusBarText.Text = $"Loading tracks from library... ({ProgressCount} of {OverallCount})"
 
-            If FileName.EndsWith(".mp3") OrElse FileName.EndsWith(".m4a") Then
+            If IsMusicFile(FileName) Then
                 Dim thisTrack = Track.Load(FileName)
 
                 If thisTrack Is Nothing Then
@@ -70,7 +70,6 @@ Class MainWindow
         ToggleButtons(True)
     End Function
 
-    ' TODO: replace other file extension checks with this function
     Private Function IsMusicFile(FileName As String) As Boolean
         Return FileName.EndsWith(".mp3") OrElse FileName.EndsWith(".m4a")
     End Function
@@ -113,7 +112,7 @@ Class MainWindow
             Dim showTrack As Track = Nothing
 
             For Each FileName In Directory.EnumerateFiles(dir)
-                If FileName.EndsWith(".mp3") OrElse FileName.EndsWith(".m4a") Then
+                If IsMusicFile(FileName) Then
                     Dim thisTrack = Await db.LoadTrackOrUseDisk(FileName)
                     If showTrack Is Nothing Then
                         showTrack = thisTrack
