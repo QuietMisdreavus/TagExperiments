@@ -21,6 +21,7 @@
                 <TextBlock x:Name="StatusBarText">Ready.</TextBlock>
             </StatusBarItem>
         </StatusBar>
+        <Button x:Name="WatchDirButton" Content="Watch Dir" HorizontalAlignment="Right" Margin="0,10,275,0" VerticalAlignment="Top" Width="75"/>
 
 
     </Grid>

@@ -9,6 +9,7 @@ Class MainWindow
     Private db As Database = New Database()
     Private WithEvents SystrayIcon As New WinForms.NotifyIcon
     Private WithEvents CloseMenu As New WinForms.MenuItem
+    Private WithEvents LibraryWatcher As FileSystemWatcher
 
     Private ManuallyClosing As Boolean = False
     Private ReadyString As String = "Ready."
@@ -67,6 +68,11 @@ Class MainWindow
 
         Me.Cursor = Cursors.Arrow
         ToggleButtons(True)
+    End Function
+
+    ' TODO: replace other file extension checks with this function
+    Private Function IsMusicFile(FileName As String) As Boolean
+        Return FileName.EndsWith(".mp3") OrElse FileName.EndsWith(".m4a")
     End Function
 
 #End Region
@@ -142,6 +148,24 @@ Class MainWindow
         End If
     End Sub
 
+    Private Sub WatchDirButton_Click(sender As Object, e As RoutedEventArgs) Handles WatchDirButton.Click
+        Dim PickDir As New WinForms.FolderBrowserDialog
+        StatusBarText.Text = "Please select a directory to import and monitor."
+        If PickDir.ShowDialog() = WinForms.DialogResult.OK Then
+            'Await Me.ImportDir(PickDir.SelectedPath)
+
+            Me.LibraryWatcher = New FileSystemWatcher(PickDir.SelectedPath)
+            Me.LibraryWatcher.NotifyFilter = NotifyFilters.LastWrite Or NotifyFilters.FileName Or NotifyFilters.DirectoryName Or NotifyFilters.CreationTime
+            Me.LibraryWatcher.IncludeSubdirectories = True
+            Me.LibraryWatcher.EnableRaisingEvents = True
+
+            ReadyString = "Watching library directory."
+            StatusBarText.Text = ReadyString
+        Else
+            StatusBarText.Text = ReadyString
+        End If
+    End Sub
+
 #End Region
 
 #Region "main window events"
@@ -183,6 +207,55 @@ Class MainWindow
     Private Sub CloseMenu_Click(sender As Object, e As EventArgs) Handles CloseMenu.Click
         ManuallyClosing = True
         Me.Close()
+    End Sub
+
+#End Region
+
+#Region "filesystem watcher events"
+
+    Private Sub LibraryWatcher_Changed(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Changed
+        If IsMusicFile(e.FullPath) Then
+            Debug.Print("file changed: {0}", e.FullPath)
+        End If
+    End Sub
+
+    Private Sub LibraryWatcher_Renamed(sender As Object, e As RenamedEventArgs) Handles LibraryWatcher.Renamed
+        If Directory.Exists(e.FullPath) Then
+            RenamedDir(e.OldFullPath, e.FullPath)
+        Else
+            RenamedFile(e.OldFullPath, e.FullPath)
+        End If
+    End Sub
+
+    Private Sub LibraryWatcher_Created(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Created
+        If IsMusicFile(e.FullPath) Then
+            Debug.Print("file created: {0}", e.FullPath)
+        End If
+    End Sub
+
+    Private Sub LibraryWatcher_Deleted(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Deleted
+        If IsMusicFile(e.FullPath) Then
+            Debug.Print("file deleted: {0}", e.FullPath)
+        End If
+    End Sub
+
+    Private Sub RenamedDir(OldName As String, NewName As String)
+        Debug.Print("dir renamed: {0} -> {1}", OldName, NewName)
+        Dim BasePath = OldName
+        For Each SubFile In Directory.EnumerateFiles(NewName)
+            Dim OldPath = Path.Combine(BasePath, Path.GetFileName(SubFile))
+            RenamedFile(OldPath, SubFile)
+        Next
+        For Each SubDir In Directory.EnumerateDirectories(NewName)
+            Dim OldPath = Path.Combine(BasePath, Path.GetFileName(SubDir))
+            RenamedDir(OldPath, SubDir)
+        Next
+    End Sub
+
+    Private Sub RenamedFile(OldName As String, NewName As String)
+        If IsMusicFile(OldName) Then
+            Debug.Print("file renamed: {0} -> {1}", OldName, NewName)
+        End If
     End Sub
 
 #End Region
