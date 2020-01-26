@@ -147,16 +147,17 @@ Class MainWindow
         End If
     End Sub
 
-    Private Sub WatchDirButton_Click(sender As Object, e As RoutedEventArgs) Handles WatchDirButton.Click
+    Private Async Sub WatchDirButton_Click(sender As Object, e As RoutedEventArgs) Handles WatchDirButton.Click
         Dim PickDir As New WinForms.FolderBrowserDialog
         StatusBarText.Text = "Please select a directory to import and monitor."
         If PickDir.ShowDialog() = WinForms.DialogResult.OK Then
-            'Await Me.ImportDir(PickDir.SelectedPath)
+            Await Me.ImportDir(PickDir.SelectedPath)
 
-            Me.LibraryWatcher = New FileSystemWatcher(PickDir.SelectedPath)
-            Me.LibraryWatcher.NotifyFilter = NotifyFilters.LastWrite Or NotifyFilters.FileName Or NotifyFilters.DirectoryName Or NotifyFilters.CreationTime
-            Me.LibraryWatcher.IncludeSubdirectories = True
-            Me.LibraryWatcher.EnableRaisingEvents = True
+            Me.LibraryWatcher = New FileSystemWatcher(PickDir.SelectedPath) With {
+                .NotifyFilter = NotifyFilters.LastWrite Or NotifyFilters.FileName Or NotifyFilters.DirectoryName Or NotifyFilters.CreationTime,
+                .IncludeSubdirectories = True,
+                .EnableRaisingEvents = True
+            }
 
             ReadyString = "Watching library directory."
             StatusBarText.Text = ReadyString
@@ -212,50 +213,78 @@ Class MainWindow
 
 #Region "filesystem watcher events"
 
-    Private Sub LibraryWatcher_Changed(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Changed
-        If IsMusicFile(e.FullPath) Then
-            Debug.Print("file changed: {0}", e.FullPath)
-        End If
-    End Sub
-
-    Private Sub LibraryWatcher_Renamed(sender As Object, e As RenamedEventArgs) Handles LibraryWatcher.Renamed
-        If Directory.Exists(e.FullPath) Then
-            RenamedDir(e.OldFullPath, e.FullPath)
+    Private Async Function DispatchEvent(f As Func(Of Task)) As Task
+        If Me.CheckAccess() Then
+            Await f()
         Else
-            RenamedFile(e.OldFullPath, e.FullPath)
+            Await Me.Dispatcher.InvokeAsync(f)
         End If
+    End Function
+
+    Private Async Sub LibraryWatcher_Changed(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Changed
+        Await DispatchEvent(Function() ChangedEvent(e.FullPath))
     End Sub
 
-    Private Sub LibraryWatcher_Created(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Created
-        If IsMusicFile(e.FullPath) Then
-            Debug.Print("file created: {0}", e.FullPath)
+    Private Async Function ChangedEvent(FullPath As String) As Task
+        If IsMusicFile(FullPath) Then
+            Debug.Print("file changed: {0}", FullPath)
+            Await db.PushTrackToDB(FullPath)
         End If
+    End Function
+
+    Private Async Sub LibraryWatcher_Renamed(sender As Object, e As RenamedEventArgs) Handles LibraryWatcher.Renamed
+        Await DispatchEvent(Function() RenamedEvent(e.OldFullPath, e.FullPath))
     End Sub
 
-    Private Sub LibraryWatcher_Deleted(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Deleted
-        If IsMusicFile(e.FullPath) Then
-            Debug.Print("file deleted: {0}", e.FullPath)
+    Private Async Function RenamedEvent(OldName As String, NewName As String) As Task
+        If Directory.Exists(NewName) Then
+            Await RenamedDir(OldName, NewName)
+        Else
+            Await RenamedFile(OldName, NewName)
         End If
+    End Function
+
+    Private Async Sub LibraryWatcher_Created(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Created
+        Await DispatchEvent(Function() CreatedEvent(e.FullPath))
     End Sub
 
-    Private Sub RenamedDir(OldName As String, NewName As String)
+    Private Async Function CreatedEvent(FullPath As String) As Task
+        If IsMusicFile(FullPath) Then
+            Debug.Print("file created: {0}", FullPath)
+            Await db.PushTrackToDB(FullPath)
+        End If
+    End Function
+
+    Private Async Sub LibraryWatcher_Deleted(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Deleted
+        Await DispatchEvent(Function() DeletedEvent(e.FullPath))
+    End Sub
+
+    Private Async Function DeletedEvent(FullPath As String) As Task
+        If IsMusicFile(FullPath) Then
+            Debug.Print("file deleted: {0}", FullPath)
+            Await db.DeleteTrack(FullPath)
+        End If
+    End Function
+
+    Private Async Function RenamedDir(OldName As String, NewName As String) As Task
         Debug.Print("dir renamed: {0} -> {1}", OldName, NewName)
         Dim BasePath = OldName
         For Each SubFile In Directory.EnumerateFiles(NewName)
             Dim OldPath = Path.Combine(BasePath, Path.GetFileName(SubFile))
-            RenamedFile(OldPath, SubFile)
+            Await RenamedFile(OldPath, SubFile)
         Next
         For Each SubDir In Directory.EnumerateDirectories(NewName)
             Dim OldPath = Path.Combine(BasePath, Path.GetFileName(SubDir))
-            RenamedDir(OldPath, SubDir)
+            Await RenamedDir(OldPath, SubDir)
         Next
-    End Sub
+    End Function
 
-    Private Sub RenamedFile(OldName As String, NewName As String)
+    Private Async Function RenamedFile(OldName As String, NewName As String) As Task
         If IsMusicFile(OldName) Then
             Debug.Print("file renamed: {0} -> {1}", OldName, NewName)
+            Await db.RenameTrackFile(OldName, NewName)
         End If
-    End Sub
+    End Function
 
 #End Region
 

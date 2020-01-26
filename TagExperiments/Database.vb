@@ -188,4 +188,53 @@ Public Class Database
         Return input = compareTrack
     End Function
 
+    ''' <summary>
+    ''' Compares the track at the given <paramref name="FileName"/> to the record in the database.
+    ''' If the database differs from the disk, the database record is updated with information from
+    ''' disk.
+    ''' </summary>
+    ''' <param name="FileName">Location of a track on disk to load.</param>
+    ''' <returns>A handle representing the asynchronous operation.</returns>
+    Public Async Function PushTrackToDB(FileName As String) As Task
+        Dim DiskTrack = Track.Load(FileName)
+        Dim CompareResult = Await CompareTrackToDB(DiskTrack)
+        If CompareResult Is Nothing OrElse CompareResult = False Then
+            Await SaveTrack(DiskTrack)
+        End If
+    End Function
+
+    ''' <summary>
+    ''' Deletes the track record with the given <paramref name="FileName"/> from the database.
+    ''' </summary>
+    ''' <param name="FileName">File name of the track to delete.</param>
+    ''' <returns>A handle to the asynchronous operation.</returns>
+    Public Async Function DeleteTrack(FileName As String) As Task
+        Dim conn = Await DBConn()
+
+        Using command As New Npgsql.NpgsqlCommand("DELETE FROM tracks WHERE filename = @filename", conn)
+            command.Parameters.AddWithValue("filename", FileName)
+            Await command.PrepareAsync()
+
+            Await command.ExecuteNonQueryAsync()
+        End Using
+    End Function
+
+    ''' <summary>
+    ''' Updates the database record for <paramref name="OldName"/> to point to <paramref name="NewName"/> instead.
+    ''' </summary>
+    ''' <param name="OldName">Full path to a track with an existing record in the database.</param>
+    ''' <param name="NewName">Full path to the file that <paramref name="OldName"/> has been renamed to.</param>
+    ''' <returns>A handle to the asynchronous operation.</returns>
+    Public Async Function RenameTrackFile(OldName As String, NewName As String) As Task
+        Dim conn = Await DBConn()
+
+        Using command As New Npgsql.NpgsqlCommand("UPDATE tracks SET filename = @newname WHERE filename = @oldname", conn)
+            command.Parameters.AddWithValue("newname", NewName)
+            command.Parameters.AddWithValue("oldname", OldName)
+            Await command.PrepareAsync()
+
+            Await command.ExecuteNonQueryAsync()
+        End Using
+    End Function
+
 End Class
