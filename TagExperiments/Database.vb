@@ -35,6 +35,8 @@ Public Class Database
 
 #End Region
 
+#Region "track maintenance"
+
     ''' <summary>
     ''' Loads a track with the given file name from the tag-experiments database.
     ''' </summary>
@@ -190,6 +192,10 @@ Public Class Database
     ''' representing whether tag information differs between the disk and database.
     ''' </returns>
     Public Async Function CompareTrackToDB(input As Track, Optional CancellationToken As CancellationToken = Nothing) As Task(Of Boolean?)
+        If input Is Nothing Then
+            Throw New ArgumentNullException("input")
+        End If
+
         Dim conn = Await DBConn(CancellationToken)
         Dim compareTrack As Track
 
@@ -224,6 +230,18 @@ Public Class Database
     ''' <returns>A handle representing the asynchronous operation.</returns>
     Public Async Function PushTrackToDB(FileName As String, Optional CancellationToken As CancellationToken = Nothing) As Task
         Dim DiskTrack = Track.Load(FileName)
+
+        If DiskTrack Is Nothing Then
+            ' sometimes, iTunes still has a file lock on the file when we try to load it. wait for a moment and try again.
+            Await Task.Delay(100, CancellationToken)
+            DiskTrack = Track.Load(FileName)
+        End If
+
+        If DiskTrack Is Nothing Then
+            ' if there's still a problem loading the file, write it off. the database might get out of sync, but it's not a big deal.
+            Exit Function
+        End If
+
         Dim CompareResult = Await CompareTrackToDB(DiskTrack, CancellationToken)
         If CompareResult Is Nothing OrElse CompareResult = False Then
             Await SaveTrack(DiskTrack, CancellationToken)
@@ -271,5 +289,47 @@ Public Class Database
             Await command.ExecuteNonQueryAsync(CancellationToken)
         End Using
     End Function
+
+#End Region
+
+#Region "queries"
+
+    ''' <summary>
+    ''' Returns the list of albums that have multiple "year" tags between the tracks.
+    ''' </summary>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
+    ''' <returns>A list of albums.</returns>
+    Public Async Function DiskCorruption(Optional CancellationToken As CancellationToken = Nothing) As Task(Of List(Of AlbumRow))
+        Dim conn = Await DBConn(CancellationToken)
+
+        Using command As New Npgsql.NpgsqlCommand("
+                SELECT COALESCE(albumartist, artist) AS a_artist, album, MAX(year) AS max_year
+                FROM tracks
+                WHERE album <> 'Singles'
+                GROUP BY a_artist, album
+                HAVING COUNT(distinct year) > 1
+                ORDER BY a_artist, max_year, album", conn)
+            Await command.PrepareAsync(CancellationToken)
+
+            Dim ret As New List(Of AlbumRow)
+
+            Using reader = Await command.ExecuteReaderAsync(CancellationToken)
+                While Await reader.ReadAsync(CancellationToken)
+                    ret.Add(New AlbumRow With {
+                        .AlbumArtist = reader.GetString(0),
+                        .Album = reader.GetString(1),
+                        .Year = reader.GetInt32(2)
+                    })
+                End While
+            End Using
+
+            Return ret
+        End Using
+    End Function
+
+#End Region
 
 End Class

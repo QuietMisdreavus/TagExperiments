@@ -79,6 +79,14 @@ Class MainWindow
         Return FileName.EndsWith(".mp3") OrElse FileName.EndsWith(".m4a")
     End Function
 
+    Private Async Function RefreshQueries(Optional CancellationToken As CancellationToken = Nothing) As Task
+        Dim DiscCorruptionResults = Await db.DiskCorruption(CancellationToken)
+        If DiscCorruptionResults.Count > DiscCorruptionGrid.Items.Count And Not Me.IsVisible Then
+            ' TODO: pop a notification via the NotifyIcon
+        End If
+        DiscCorruptionGrid.ItemsSource = DiscCorruptionResults
+    End Function
+
 #End Region
 
 #Region "button handlers"
@@ -180,6 +188,8 @@ Class MainWindow
                         While TaskQueue.TryDequeue(NewEvent)
                             Await NewEvent()
                         End While
+
+                        Await Me.RefreshQueries(CancelWatching.Token)
 
                         Await Task.Delay(500, CancelWatching.Token)
                     Catch ex As TaskCanceledException

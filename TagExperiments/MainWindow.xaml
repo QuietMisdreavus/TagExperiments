@@ -5,23 +5,36 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:TagExperiments"
         mc:Ignorable="d"
-        Title="MainWindow" Height="415.447" Width="400.745">
+        Title="Library Organizer" Height="489.43" Width="525.948">
     <Grid>
         <Button x:Name="loadFileButton" Content="Load File" HorizontalAlignment="Right" Margin="0,10,10,0" VerticalAlignment="Top" Width="75" RenderTransformOrigin="-0.423,0.379"/>
-        <DataGrid x:Name="trackInfoGrid" Margin="10,40,10,29" IsReadOnly="True" ItemsSource="{Binding}" AutoGenerateColumns="False">
-            <DataGrid.Columns>
-                <DataGridTextColumn Binding="{Binding Name}" ClipboardContentBinding="{x:Null}" Header="Tag"/>
-                <DataGridTextColumn Binding="{Binding Value}" ClipboardContentBinding="{x:Null}" Header="Value"/>
-            </DataGrid.Columns>
-        </DataGrid>
         <Button x:Name="loadDirButton" Content="Load Dir" HorizontalAlignment="Right" Margin="0,10,90,0" VerticalAlignment="Top" Width="75"/>
         <Button x:Name="importDirButton" Content="Import Library" HorizontalAlignment="Right" Margin="0,10,170,0" VerticalAlignment="Top" Width="100"/>
-        <StatusBar Height="24" Margin="0,345,0,0" VerticalAlignment="Bottom" Width="393">
+        <StatusBar Margin="0,345,0,0" VerticalAlignment="Bottom">
             <StatusBarItem>
                 <TextBlock x:Name="StatusBarText">Ready.</TextBlock>
             </StatusBarItem>
         </StatusBar>
         <Button x:Name="WatchDirButton" Content="Watch Dir" HorizontalAlignment="Right" Margin="0,10,275,0" VerticalAlignment="Top" Width="75"/>
+        <TabControl x:Name="tabControl" Margin="10,35,10,27">
+            <TabItem x:Name="TrackInfoTab" Header="Track Info">
+                <DataGrid x:Name="trackInfoGrid" IsReadOnly="True" ItemsSource="{Binding}" AutoGenerateColumns="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Binding="{Binding Name}" ClipboardContentBinding="{x:Null}" Header="Tag"/>
+                        <DataGridTextColumn Binding="{Binding Value}" ClipboardContentBinding="{x:Null}" Header="Value"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+            <TabItem x:Name="DiscCorruptionTab" Header="Disc Corruption">
+                <DataGrid x:Name="DiscCorruptionGrid" IsReadOnly="True" ItemsSource="{Binding}" AutoGenerateColumns="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Binding="{Binding AlbumArtist}" ClipboardContentBinding="{x:Null}" Header="Album Artist"/>
+                        <DataGridTextColumn Binding="{Binding Album}" ClipboardContentBinding="{x:Null}" Header="Album"/>
+                        <DataGridTextColumn Binding="{Binding Year}" ClipboardContentBinding="{x:Null}" Header="Year"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+        </TabControl>
 
 
     </Grid>
