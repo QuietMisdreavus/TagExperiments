@@ -19,6 +19,8 @@ Class MainWindow
     Private TaskQueue As New ConcurrentQueue(Of Func(Of Task))
     Private CancelWatching As New CancellationTokenSource
 
+    Private LaunchTab As TabItem = Nothing
+
 #End Region
 
 #Region "helper methods"
@@ -82,7 +84,11 @@ Class MainWindow
     Private Async Function RefreshQueries(Optional CancellationToken As CancellationToken = Nothing) As Task
         Dim DiscCorruptionResults = Await db.DiskCorruption(CancellationToken)
         If DiscCorruptionResults.Count > DiscCorruptionGrid.Items.Count And Not Me.IsVisible Then
-            ' TODO: pop a notification via the NotifyIcon
+            LaunchTab = DiscCorruptionTab
+            SystrayIcon.ShowBalloonTip(10000,
+                                       "Music Library Changed",
+                                       "A change to your music library has corrupted the disc tags to some albums.",
+                                        WinForms.ToolTipIcon.Warning)
         End If
         DiscCorruptionGrid.ItemsSource = DiscCorruptionResults
     End Function
@@ -257,6 +263,19 @@ Class MainWindow
     Private Sub CloseMenu_Click(sender As Object, e As EventArgs) Handles CloseMenu.Click
         ManuallyClosing = True
         Me.Close()
+    End Sub
+
+    Private Sub SystrayIcon_BalloonTipClicked(sender As Object, e As EventArgs) Handles SystrayIcon.BalloonTipClicked
+        If Not Me.IsVisible Then
+            Me.Show()
+        End If
+        If Me.WindowState <> WindowState.Normal Then
+            Me.WindowState = WindowState.Normal
+        End If
+        If LaunchTab IsNot Nothing Then
+            LaunchTab.IsSelected = True
+            LaunchTab = Nothing
+        End If
     End Sub
 
 #End Region
