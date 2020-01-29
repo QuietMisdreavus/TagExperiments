@@ -1,4 +1,5 @@
-﻿''' <summary>
+﻿Imports System.Threading
+''' <summary>
 ''' Handle for database operations. Maintains a connection to the tag-experiments database and
 ''' uses it for any calls that synchronize with it.
 ''' </summary>
@@ -14,11 +15,15 @@ Public Class Database
     ''' <summary>
     ''' Fetches the <see cref="Npgsql.NpgsqlConnection"/>, or creates one if one does not exist.
     ''' </summary>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
     ''' <returns></returns>
-    Private Async Function DBConn() As Task(Of Npgsql.NpgsqlConnection)
+    Private Async Function DBConn(Optional CancellationToken As CancellationToken = Nothing) As Task(Of Npgsql.NpgsqlConnection)
         If _connection Is Nothing Then
             _connection = New Npgsql.NpgsqlConnection(connString)
-            Await _connection.OpenAsync
+            Await _connection.OpenAsync(CancellationToken)
         End If
 
         Return _connection
@@ -34,12 +39,16 @@ Public Class Database
     ''' Loads a track with the given file name from the tag-experiments database.
     ''' </summary>
     ''' <param name="FileName">Track file to load.</param>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
     ''' <returns>
     ''' A <see cref="Track"/> if one exists in the database with the given <paramref name="FileName"/>,
     ''' or <code>Nothing</code> if not.
     ''' </returns>
-    Public Async Function LoadTrack(FileName As String) As Task(Of Track)
-        Dim conn = Await DBConn()
+    Public Async Function LoadTrack(FileName As String, Optional CancellationToken As CancellationToken = Nothing) As Task(Of Track)
+        Dim conn = Await DBConn(CancellationToken)
 
         Using command As New Npgsql.NpgsqlCommand("
                     SELECT
@@ -56,10 +65,10 @@ Public Class Database
                     FROM tracks
                     WHERE filename = @filename", conn)
             command.Parameters.AddWithValue("filename", FileName)
-            Await command.PrepareAsync()
+            Await command.PrepareAsync(CancellationToken)
 
-            Using reader = Await command.ExecuteReaderAsync()
-                If reader.HasRows AndAlso Await reader.ReadAsync Then
+            Using reader = Await command.ExecuteReaderAsync(CancellationToken)
+                If reader.HasRows AndAlso Await reader.ReadAsync(CancellationToken) Then
                     Dim ret As New Track With {
                             .Filename = reader.GetString(0),
                             .Year = reader.GetInt32(5),
@@ -102,14 +111,20 @@ Public Class Database
     ''' <param name="SaveToDB">
     ''' If <code>True</code>, adds track information to the database if it doesn't exist. Defaults to <code>True</code>.
     ''' </param>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
     ''' <returns>Tag information for the corresponding <see cref="Track"/>.</returns>
-    Public Async Function LoadTrackOrUseDisk(FileName As String, Optional SaveToDB As Boolean = True) As Task(Of Track)
-        Dim ret = Await LoadTrack(FileName)
+    Public Async Function LoadTrackOrUseDisk(FileName As String,
+                                             Optional SaveToDB As Boolean = True,
+                                             Optional CancellationToken As CancellationToken = Nothing) As Task(Of Track)
+        Dim ret = Await LoadTrack(FileName, CancellationToken)
         If ret Is Nothing Then
             ret = Track.Load(FileName)
 
             If SaveToDB And ret IsNot Nothing Then
-                Await SaveTrack(ret)
+                Await SaveTrack(ret, CancellationToken)
             End If
         End If
 
@@ -120,9 +135,13 @@ Public Class Database
     ''' Saves the given <see cref="Track"/> to the database.
     ''' </summary>
     ''' <param name="input">Track information to save.</param>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
     ''' <returns>Handle representing the asynchronous operation.</returns>
-    Public Async Function SaveTrack(input As Track) As Task
-        Dim conn = Await DBConn()
+    Public Async Function SaveTrack(input As Track, Optional CancellationToken As CancellationToken = Nothing) As Task
+        Dim conn = Await DBConn(CancellationToken)
 
         Using command As New Npgsql.NpgsqlCommand("
                 INSERT INTO tracks
@@ -150,9 +169,9 @@ Public Class Database
             command.Parameters.AddWithValue("discnumber", CInt(input.DiscNumber))
             command.Parameters.AddWithValue("disctotal", CInt(input.DiscCount))
 
-            Await command.PrepareAsync()
+            Await command.PrepareAsync(CancellationToken)
 
-            Await command.ExecuteNonQueryAsync()
+            Await command.ExecuteNonQueryAsync(CancellationToken)
 
             input.SyncedToDB = True
         End Using
@@ -162,12 +181,16 @@ Public Class Database
     ''' Compares the given <see cref="Track"/> to see whether it differs between the disk and the database.
     ''' </summary>
     ''' <param name="input">Track information to load.</param>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
     ''' <returns>
     ''' <code>Nothing</code> if no track information exists in the database, otherwise a value
     ''' representing whether tag information differs between the disk and database.
     ''' </returns>
-    Public Async Function CompareTrackToDB(input As Track) As Task(Of Boolean?)
-        Dim conn = Await DBConn()
+    Public Async Function CompareTrackToDB(input As Track, Optional CancellationToken As CancellationToken = Nothing) As Task(Of Boolean?)
+        Dim conn = Await DBConn(CancellationToken)
         Dim compareTrack As Track
 
         If input.SyncedToDB Then
@@ -177,7 +200,7 @@ Public Class Database
         Else
             ' this track reflects the track on disk. load from the db and compare
 
-            compareTrack = Await LoadTrack(input.Filename)
+            compareTrack = Await LoadTrack(input.Filename, CancellationToken)
         End If
 
         If compareTrack Is Nothing Then
@@ -194,12 +217,16 @@ Public Class Database
     ''' disk.
     ''' </summary>
     ''' <param name="FileName">Location of a track on disk to load.</param>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
     ''' <returns>A handle representing the asynchronous operation.</returns>
-    Public Async Function PushTrackToDB(FileName As String) As Task
+    Public Async Function PushTrackToDB(FileName As String, Optional CancellationToken As CancellationToken = Nothing) As Task
         Dim DiskTrack = Track.Load(FileName)
-        Dim CompareResult = Await CompareTrackToDB(DiskTrack)
+        Dim CompareResult = Await CompareTrackToDB(DiskTrack, CancellationToken)
         If CompareResult Is Nothing OrElse CompareResult = False Then
-            Await SaveTrack(DiskTrack)
+            Await SaveTrack(DiskTrack, CancellationToken)
         End If
     End Function
 
@@ -207,15 +234,19 @@ Public Class Database
     ''' Deletes the track record with the given <paramref name="FileName"/> from the database.
     ''' </summary>
     ''' <param name="FileName">File name of the track to delete.</param>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
     ''' <returns>A handle to the asynchronous operation.</returns>
-    Public Async Function DeleteTrack(FileName As String) As Task
-        Dim conn = Await DBConn()
+    Public Async Function DeleteTrack(FileName As String, Optional CancellationToken As CancellationToken = Nothing) As Task
+        Dim conn = Await DBConn(CancellationToken)
 
         Using command As New Npgsql.NpgsqlCommand("DELETE FROM tracks WHERE filename = @filename", conn)
             command.Parameters.AddWithValue("filename", FileName)
-            Await command.PrepareAsync()
+            Await command.PrepareAsync(CancellationToken)
 
-            Await command.ExecuteNonQueryAsync()
+            Await command.ExecuteNonQueryAsync(CancellationToken)
         End Using
     End Function
 
@@ -224,16 +255,20 @@ Public Class Database
     ''' </summary>
     ''' <param name="OldName">Full path to a track with an existing record in the database.</param>
     ''' <param name="NewName">Full path to the file that <paramref name="OldName"/> has been renamed to.</param>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
     ''' <returns>A handle to the asynchronous operation.</returns>
-    Public Async Function RenameTrackFile(OldName As String, NewName As String) As Task
-        Dim conn = Await DBConn()
+    Public Async Function RenameTrackFile(OldName As String, NewName As String, Optional CancellationToken As CancellationToken = Nothing) As Task
+        Dim conn = Await DBConn(CancellationToken)
 
         Using command As New Npgsql.NpgsqlCommand("UPDATE tracks SET filename = @newname WHERE filename = @oldname", conn)
             command.Parameters.AddWithValue("newname", NewName)
             command.Parameters.AddWithValue("oldname", OldName)
-            Await command.PrepareAsync()
+            Await command.PrepareAsync(CancellationToken)
 
-            Await command.ExecuteNonQueryAsync()
+            Await command.ExecuteNonQueryAsync(CancellationToken)
         End Using
     End Function
 

@@ -264,7 +264,7 @@ Class MainWindow
     Private Async Function ChangedEvent(FullPath As String) As Task
         If IsMusicFile(FullPath) Then
             Debug.Print("file changed: {0}", FullPath)
-            Await db.PushTrackToDB(FullPath)
+            Await db.PushTrackToDB(FullPath, CancelWatching.Token)
         End If
     End Function
 
@@ -287,7 +287,7 @@ Class MainWindow
     Private Async Function CreatedEvent(FullPath As String) As Task
         If IsMusicFile(FullPath) Then
             Debug.Print("file created: {0}", FullPath)
-            Await db.PushTrackToDB(FullPath)
+            Await db.PushTrackToDB(FullPath, CancelWatching.Token)
         End If
     End Function
 
@@ -298,7 +298,7 @@ Class MainWindow
     Private Async Function DeletedEvent(FullPath As String) As Task
         If IsMusicFile(FullPath) Then
             Debug.Print("file deleted: {0}", FullPath)
-            Await db.DeleteTrack(FullPath)
+            Await db.DeleteTrack(FullPath, CancelWatching.Token)
         End If
     End Function
 
@@ -318,7 +318,7 @@ Class MainWindow
     Private Async Function RenamedFile(OldName As String, NewName As String) As Task
         If IsMusicFile(OldName) Then
             Debug.Print("file renamed: {0} -> {1}", OldName, NewName)
-            Await db.RenameTrackFile(OldName, NewName)
+            Await db.RenameTrackFile(OldName, NewName, CancelWatching.Token)
         End If
     End Function
 
