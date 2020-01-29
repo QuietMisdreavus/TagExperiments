@@ -1,18 +1,23 @@
-﻿Imports System.ComponentModel
+﻿Imports System.Collections.Concurrent
+Imports System.ComponentModel
 Imports System.IO
+Imports System.Threading
 Imports WinForms = System.Windows.Forms
 
 Class MainWindow
 
 #Region "fields"
 
-    Private db As Database = New Database()
+    Private db As New Database
     Private WithEvents SystrayIcon As New WinForms.NotifyIcon
     Private WithEvents CloseMenu As New WinForms.MenuItem
     Private WithEvents LibraryWatcher As FileSystemWatcher
 
     Private ManuallyClosing As Boolean = False
     Private ReadyString As String = "Ready."
+
+    Private TaskQueue As New ConcurrentQueue(Of Func(Of Task))
+    Private CancelWatching As New CancellationTokenSource
 
 #End Region
 
@@ -148,21 +153,56 @@ Class MainWindow
     End Sub
 
     Private Async Sub WatchDirButton_Click(sender As Object, e As RoutedEventArgs) Handles WatchDirButton.Click
-        Dim PickDir As New WinForms.FolderBrowserDialog
-        StatusBarText.Text = "Please select a directory to import and monitor."
-        If PickDir.ShowDialog() = WinForms.DialogResult.OK Then
-            Await Me.ImportDir(PickDir.SelectedPath)
+        WatchDirButton.IsEnabled = False
 
-            Me.LibraryWatcher = New FileSystemWatcher(PickDir.SelectedPath) With {
-                .NotifyFilter = NotifyFilters.LastWrite Or NotifyFilters.FileName Or NotifyFilters.DirectoryName Or NotifyFilters.CreationTime,
-                .IncludeSubdirectories = True,
-                .EnableRaisingEvents = True
-            }
+        If LibraryWatcher Is Nothing Then
+            Dim PickDir As New WinForms.FolderBrowserDialog
+            StatusBarText.Text = "Please select a directory to import and monitor."
+            If PickDir.ShowDialog() = WinForms.DialogResult.OK Then
+                Await Me.ImportDir(PickDir.SelectedPath)
 
-            ReadyString = "Watching library directory."
-            StatusBarText.Text = ReadyString
+                WatchDirButton.Content = "Cancel Watch"
+
+                Me.LibraryWatcher = New FileSystemWatcher(PickDir.SelectedPath) With {
+                    .NotifyFilter = NotifyFilters.LastWrite Or NotifyFilters.FileName Or NotifyFilters.DirectoryName Or NotifyFilters.CreationTime,
+                    .IncludeSubdirectories = True,
+                    .EnableRaisingEvents = True
+                }
+
+                ReadyString = "Watching library directory."
+                StatusBarText.Text = ReadyString
+
+                WatchDirButton.IsEnabled = True
+
+                While Not CancelWatching.IsCancellationRequested
+                    Try
+                        Dim NewEvent As Func(Of Task) = Nothing
+                        While TaskQueue.TryDequeue(NewEvent)
+                            Await NewEvent()
+                        End While
+
+                        Await Task.Delay(500, CancelWatching.Token)
+                    Catch ex As TaskCanceledException
+                        Exit While
+                    End Try
+                End While
+            Else
+                StatusBarText.Text = ReadyString
+            End If
         Else
+            LibraryWatcher.EnableRaisingEvents = False
+            LibraryWatcher = Nothing
+
+            CancelWatching.Cancel()
+            CancelWatching.Dispose()
+            CancelWatching = New CancellationTokenSource
+
+            WatchDirButton.Content = "Watch Dir"
+
+            ReadyString = "Ready."
             StatusBarText.Text = ReadyString
+
+            WatchDirButton.IsEnabled = True
         End If
     End Sub
 
@@ -213,16 +253,12 @@ Class MainWindow
 
 #Region "filesystem watcher events"
 
-    Private Async Function DispatchEvent(f As Func(Of Task)) As Task
-        If Me.CheckAccess() Then
-            Await f()
-        Else
-            Await Me.Dispatcher.InvokeAsync(f)
-        End If
-    End Function
+    Private Sub DispatchEvent(f As Func(Of Task))
+        TaskQueue.Enqueue(f)
+    End Sub
 
-    Private Async Sub LibraryWatcher_Changed(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Changed
-        Await DispatchEvent(Function() ChangedEvent(e.FullPath))
+    Private Sub LibraryWatcher_Changed(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Changed
+        DispatchEvent(Function() ChangedEvent(e.FullPath))
     End Sub
 
     Private Async Function ChangedEvent(FullPath As String) As Task
@@ -232,8 +268,8 @@ Class MainWindow
         End If
     End Function
 
-    Private Async Sub LibraryWatcher_Renamed(sender As Object, e As RenamedEventArgs) Handles LibraryWatcher.Renamed
-        Await DispatchEvent(Function() RenamedEvent(e.OldFullPath, e.FullPath))
+    Private Sub LibraryWatcher_Renamed(sender As Object, e As RenamedEventArgs) Handles LibraryWatcher.Renamed
+        DispatchEvent(Function() RenamedEvent(e.OldFullPath, e.FullPath))
     End Sub
 
     Private Async Function RenamedEvent(OldName As String, NewName As String) As Task
@@ -244,8 +280,8 @@ Class MainWindow
         End If
     End Function
 
-    Private Async Sub LibraryWatcher_Created(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Created
-        Await DispatchEvent(Function() CreatedEvent(e.FullPath))
+    Private Sub LibraryWatcher_Created(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Created
+        DispatchEvent(Function() CreatedEvent(e.FullPath))
     End Sub
 
     Private Async Function CreatedEvent(FullPath As String) As Task
@@ -255,8 +291,8 @@ Class MainWindow
         End If
     End Function
 
-    Private Async Sub LibraryWatcher_Deleted(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Deleted
-        Await DispatchEvent(Function() DeletedEvent(e.FullPath))
+    Private Sub LibraryWatcher_Deleted(sender As Object, e As FileSystemEventArgs) Handles LibraryWatcher.Deleted
+        DispatchEvent(Function() DeletedEvent(e.FullPath))
     End Sub
 
     Private Async Function DeletedEvent(FullPath As String) As Task
