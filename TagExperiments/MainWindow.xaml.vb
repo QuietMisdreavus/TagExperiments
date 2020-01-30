@@ -82,15 +82,41 @@ Class MainWindow
     End Function
 
     Private Async Function RefreshQueries(Optional CancellationToken As CancellationToken = Nothing) As Task
+        Dim NotifyTabs As New List(Of TabItem)
+
         Dim DiscCorruptionResults = Await db.DiskCorruption(CancellationToken)
         If DiscCorruptionResults.Count > DiscCorruptionGrid.Items.Count And Not Me.IsVisible Then
-            LaunchTab = DiscCorruptionTab
-            SystrayIcon.ShowBalloonTip(10000,
-                                       "Music Library Changed",
-                                       "A change to your music library has corrupted the disc tags to some albums.",
-                                        WinForms.ToolTipIcon.Warning)
+            NotifyTabs.Add(DiscCorruptionTab)
         End If
         DiscCorruptionGrid.ItemsSource = DiscCorruptionResults
+
+        Dim TrackCountResults = Await db.MissingTrackCount(CancellationToken)
+        If TrackCountResults.Count > MissingTrackCountGrid.Items.Count And Not Me.IsVisible Then
+            NotifyTabs.Add(MissingTrackCountTab)
+        End If
+        MissingTrackCountGrid.ItemsSource = TrackCountResults
+
+        If NotifyTabs.Count > 0 Then
+            Dim NotifyMessage = ""
+
+            For Each ActiveTab In NotifyTabs
+                If NotifyMessage <> "" Then
+                    NotifyMessage += "\n"
+                End If
+
+                If ActiveTab Is DiscCorruptionTab Then
+                    NotifyMessage += "The disc tags on some albums are corrupted."
+                ElseIf ActiveTab Is MissingTrackCountTab Then
+                    NotifyMessage += "Some tracks are missing Track Count tags."
+                End If
+            Next
+
+            LaunchTab = NotifyTabs.First()
+            SystrayIcon.ShowBalloonTip(10000,
+                                       "Music Library Changed",
+                                       NotifyMessage,
+                                       WinForms.ToolTipIcon.Warning)
+        End If
     End Function
 
 #End Region
