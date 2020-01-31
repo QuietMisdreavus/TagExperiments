@@ -16,6 +16,9 @@ Public Class Track
     Public Property DiscNumber As UInteger
     Public Property DiscCount As UInteger
 
+    Public Property ReplayGainAlbumGain As String
+    Public Property ReplayGainTrackGain As String
+
     Public Property SyncedToDB As Boolean = False
 
     ''' <summary>
@@ -31,6 +34,29 @@ Public Class Track
             End If
 
             Using tagFile = TagLib.File.Create(FileName)
+                Dim ReplayGainAlbumGain As String = Nothing
+                Dim ReplayGainTrackGain As String = Nothing
+
+                If tagFile.TagTypes.HasFlag(TagLib.TagTypes.Apple) Then
+                    Dim InnerTag As TagLib.Mpeg4.AppleTag = tagFile.GetTag(TagLib.TagTypes.Apple)
+                    ' the name tags for comment fields are stored with four leading null bytes, and taglib# won't trim them when looking them up
+                    ReplayGainAlbumGain = InnerTag.GetDashBox(vbNullChar & vbNullChar & vbNullChar & vbNullChar & "com.apple.iTunes",
+                                                              vbNullChar & vbNullChar & vbNullChar & vbNullChar & "replaygain_album_gain")
+                    ReplayGainTrackGain = InnerTag.GetDashBox(vbNullChar & vbNullChar & vbNullChar & vbNullChar & "com.apple.iTunes",
+                                                              vbNullChar & vbNullChar & vbNullChar & vbNullChar & "replaygain_track_gain")
+                ElseIf tagFile.TagTypes.HasFlag(TagLib.TagTypes.Id3v2) Then
+                    Dim InnerTag As TagLib.Id3v2.Tag = tagFile.GetTag(TagLib.TagTypes.Id3v2)
+                    For Each TextTag In InnerTag.GetFrames(Of TagLib.Id3v2.UserTextInformationFrame)(TagLib.ByteVector.FromString("TXXX", TagLib.StringType.UTF8))
+                        If TextTag.Description = "replaygain_album_gain" Then
+                            ReplayGainAlbumGain = TextTag.Text.First()
+                        ElseIf TextTag.Description = "replaygain_track_gain" Then
+                            ReplayGainTrackGain = TextTag.Text.First()
+                        End If
+                    Next
+                Else
+                    Debug.Write($"track file has unknown tag type: {tagFile.TagTypes} at file {FileName}")
+                End If
+
                 Return New Track With {
                     .Filename = FileName,
                     .Title = tagFile.Tag.Title,
@@ -41,7 +67,10 @@ Public Class Track
                     .TrackNumber = tagFile.Tag.Track,
                     .TrackCount = tagFile.Tag.TrackCount,
                     .DiscNumber = tagFile.Tag.Disc,
-                    .DiscCount = tagFile.Tag.DiscCount
+                    .DiscCount = tagFile.Tag.DiscCount,
+                    .ReplayGainAlbumGain = ReplayGainAlbumGain,
+                    .ReplayGainTrackGain = ReplayGainTrackGain,
+                    .SyncedToDB = False
                 }
             End Using
         Catch ex As Exception
@@ -101,7 +130,9 @@ Public Class Track
             New TagRow("Year", displayYear),
             New TagRow("Title", Title),
             New TagRow("Track Number", $"{displayTrackNumber}/{displayTrackCount}"),
-            New TagRow("Disc Number", $"{displayDiscNumber}/{displayDiscCount}")
+            New TagRow("Disc Number", $"{displayDiscNumber}/{displayDiscCount}"),
+            New TagRow("ReplayGain Album Gain", ReplayGainAlbumGain),
+            New TagRow("ReplayGain Track Gain", ReplayGainTrackGain)
         }
     End Function
 
@@ -146,6 +177,14 @@ Public Class Track
         If Me.DiscCount <> other.DiscCount Then
             Me.DiscCount = 0
         End If
+
+        If Me.ReplayGainAlbumGain <> other.ReplayGainAlbumGain Then
+            Me.ReplayGainAlbumGain = "(..)"
+        End If
+
+        If Me.ReplayGainTrackGain <> other.ReplayGainTrackGain Then
+            Me.ReplayGainTrackGain = "(..)"
+        End If
     End Sub
 
 #End Region
@@ -161,7 +200,9 @@ Public Class Track
             AndAlso left.TrackNumber = right.TrackNumber _
             AndAlso left.TrackCount = right.TrackCount _
             AndAlso left.DiscNumber = right.DiscNumber _
-            AndAlso left.DiscCount = right.DiscCount
+            AndAlso left.DiscCount = right.DiscCount _
+            AndAlso left.ReplayGainAlbumGain = right.ReplayGainAlbumGain _
+            AndAlso left.ReplayGainTrackGain = right.ReplayGainTrackGain
     End Operator
 
     Public Shared Operator <>(left As Track, right As Track) As Boolean

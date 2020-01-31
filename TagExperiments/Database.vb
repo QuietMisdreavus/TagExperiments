@@ -63,7 +63,9 @@ Public NotInheritable Class Database
                         tracknumber,
                         tracktotal,
                         discnumber,
-                        disctotal
+                        disctotal,
+                        replaygain_album_gain,
+                        replaygain_track_gain
                     FROM tracks
                     WHERE filename = @filename", conn)
             command.Parameters.AddWithValue("filename", FileName)
@@ -95,6 +97,14 @@ Public NotInheritable Class Database
 
                     If Not reader.IsDBNull(4) Then
                         ret.AlbumArtist = reader.GetString(4)
+                    End If
+
+                    If Not reader.IsDBNull(10) Then
+                        ret.ReplayGainAlbumGain = reader.GetString(10)
+                    End If
+
+                    If Not reader.IsDBNull(11) Then
+                        ret.ReplayGainTrackGain = reader.GetString(11)
                     End If
 
                     Return ret
@@ -147,9 +157,9 @@ Public NotInheritable Class Database
 
         Using command As New Npgsql.NpgsqlCommand("
                 INSERT INTO tracks
-                (filename, title, artist, album, albumartist, year, tracknumber, tracktotal, discnumber, disctotal)
+                (filename, title, artist, album, albumartist, year, tracknumber, tracktotal, discnumber, disctotal, replaygain_album_gain, replaygain_track_gain)
                 VALUES
-                (@filename, @title, @artist, @album, @albumartist, @year, @tracknumber, @tracktotal, @discnumber, @disctotal)
+                (@filename, @title, @artist, @album, @albumartist, @year, @tracknumber, @tracktotal, @discnumber, @disctotal, @replaygain_album_gain, @replaygain_track_gain)
                 ON CONFLICT (filename) DO UPDATE
                 SET title = EXCLUDED.title,
                     artist = EXCLUDED.artist,
@@ -159,7 +169,9 @@ Public NotInheritable Class Database
                     tracknumber = EXCLUDED.tracknumber,
                     tracktotal = EXCLUDED.tracktotal,
                     discnumber = EXCLUDED.discnumber,
-                    disctotal = EXCLUDED.disctotal", conn)
+                    disctotal = EXCLUDED.disctotal,
+                    replaygain_album_gain = EXCLUDED.replaygain_album_gain,
+                    replaygain_track_gain = EXCLUDED.replaygain_track_gain", conn)
             command.Parameters.AddWithValue("filename", NpgsqlTypes.NpgsqlDbType.Text, input.Filename)
             command.Parameters.AddWithValue("title", NpgsqlTypes.NpgsqlDbType.Text, If(input.Title, DBNull.Value))
             command.Parameters.AddWithValue("artist", NpgsqlTypes.NpgsqlDbType.Text, If(input.Artist, DBNull.Value))
@@ -170,6 +182,8 @@ Public NotInheritable Class Database
             command.Parameters.AddWithValue("tracktotal", CInt(input.TrackCount))
             command.Parameters.AddWithValue("discnumber", CInt(input.DiscNumber))
             command.Parameters.AddWithValue("disctotal", CInt(input.DiscCount))
+            command.Parameters.AddWithValue("replaygain_album_gain", NpgsqlTypes.NpgsqlDbType.Text, If(input.ReplayGainAlbumGain, DBNull.Value))
+            command.Parameters.AddWithValue("replaygain_track_gain", NpgsqlTypes.NpgsqlDbType.Text, If(input.ReplayGainTrackGain, DBNull.Value))
 
             Await command.PrepareAsync(CancellationToken)
 
