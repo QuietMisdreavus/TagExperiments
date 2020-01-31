@@ -43,6 +43,15 @@
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>
+            <TabItem x:Name="CorruptReplayGainTab" Header="Corrupt ReplayGain">
+                <DataGrid x:Name="CorruptReplayGainGrid" IsReadOnly="True" ItemsSource="{Binding}" AutoGenerateColumns="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Binding="{Binding AlbumArtist}" ClipboardContentBinding="{x:Null}" Header="Album Artist"/>
+                        <DataGridTextColumn Binding="{Binding Album}" ClipboardContentBinding="{x:Null}" Header="Album"/>
+                        <DataGridTextColumn Binding="{Binding Year}" ClipboardContentBinding="{x:Null}" Header="Year"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>

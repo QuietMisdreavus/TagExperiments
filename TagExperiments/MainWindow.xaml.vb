@@ -98,6 +98,12 @@ Class MainWindow
         End If
         MissingTrackCountGrid.ItemsSource = TrackCountResults
 
+        Dim ReplayGainResults = Await db.CorruptedReplayGain(CancellationToken)
+        If ReplayGainResults.Count > CorruptReplayGainGrid.Items.Count And Not Me.IsVisible Then
+            NotifyTabs.Add(CorruptReplayGainTab)
+        End If
+        CorruptReplayGainGrid.ItemsSource = ReplayGainResults
+
         If NotifyTabs.Count > 0 Then
             Dim NotifyMessage = ""
 
@@ -110,6 +116,8 @@ Class MainWindow
                     NotifyMessage += "The disc tags on some albums are corrupted."
                 ElseIf ActiveTab Is MissingTrackCountTab Then
                     NotifyMessage += "Some tracks are missing Track Count tags."
+                ElseIf ActiveTab Is CorruptReplayGainTab Then
+                    NotifyMessage += "The ReplayGain tags on some albums are corrupted."
                 End If
             Next
 

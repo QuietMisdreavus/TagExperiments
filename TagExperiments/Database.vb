@@ -377,6 +377,43 @@ Public NotInheritable Class Database
         End Using
     End Function
 
+    ''' <summary>
+    ''' Returns the list of albums that have multiple "ReplayGain Album Gain" tags between the tracks.
+    ''' </summary>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
+    ''' <returns>A list of albums.</returns>
+    Public Async Function CorruptedReplayGain(Optional CancellationToken As CancellationToken = Nothing) As Task(Of List(Of AlbumRow))
+        Dim conn = Await DBConn(CancellationToken)
+
+        Using command As New Npgsql.NpgsqlCommand("
+                SELECT COALESCE(albumartist, artist) AS a_artist, album, MAX(year) AS year
+                FROM tracks
+                WHERE tracktotal <> 0
+                GROUP BY a_artist, album
+                HAVING COUNT(DISTINCT replaygain_album_gain) > 1
+                ORDER BY a_artist, year, album", conn)
+            Await command.PrepareAsync(CancellationToken)
+
+            Dim ret As New List(Of AlbumRow)
+
+            Using reader = Await command.ExecuteReaderAsync(CancellationToken)
+                While Await reader.ReadAsync(CancellationToken)
+                    ret.Add(New AlbumRow With {
+                        .AlbumArtist = reader.GetString(0),
+                        .Album = reader.GetString(1),
+                        .Year = reader.GetInt32(2)
+                    })
+                End While
+            End Using
+
+            Return ret
+        End Using
+    End Function
+
+
 #End Region
 
 End Class
