@@ -3,7 +3,7 @@
 ''' Handle for database operations. Maintains a connection to the tag-experiments database and
 ''' uses it for any calls that synchronize with it.
 ''' </summary>
-Public Class Database
+Public NotInheritable Class Database
     Implements IDisposable
 
     Const connString = "Host=localhost;Username=music;Password=music;Database=tag-experiments"
