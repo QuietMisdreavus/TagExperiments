@@ -71,6 +71,8 @@ Class MainWindow
         ' because this is mainly a DB maintenance option, there's nothing to really display
         trackInfoGrid.ItemsSource = New List(Of TagRow)
 
+        Await RefreshQueries()
+
         Dim CompleteText = $"Imported {ImportCount} (of {ProgressCount}) tracks to database."
         MessageBox.Show(CompleteText)
         StatusBarText.Text = CompleteText
@@ -287,7 +289,7 @@ Class MainWindow
 
 #Region "main window events"
 
-    Private Sub MainWindow_Initialized(sender As Object, e As EventArgs) Handles Me.Initialized
+    Private Async Sub MainWindow_Initialized(sender As Object, e As EventArgs) Handles Me.Initialized
         SystrayIcon.Icon = My.Resources.TagExperimentsIcon
         SystrayIcon.Text = "TagExperiments"
 
@@ -296,6 +298,8 @@ Class MainWindow
         SystrayIcon.ContextMenu.MenuItems.Add(CloseMenu)
 
         SystrayIcon.Visible = True
+
+        Await RefreshQueries()
     End Sub
 
     Private Sub MainWindow_Closed(sender As Object, e As EventArgs) Handles Me.Closed
