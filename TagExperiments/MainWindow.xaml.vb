@@ -30,6 +30,7 @@ Class MainWindow
         loadFileButton.IsEnabled = ButtonState
         loadDirButton.IsEnabled = ButtonState
         importDirButton.IsEnabled = ButtonState
+        WatchDirButton.IsEnabled = ButtonState
     End Sub
 
     Private Async Function ImportDir(dir As String) As Task
