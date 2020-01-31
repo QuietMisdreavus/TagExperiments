@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:TagExperiments"
         mc:Ignorable="d"
-        Title="Library Organizer" Height="489.43" Width="525.948">
+        Title="Library Monitor" Height="489.43" Width="525.948">
     <Grid>
         <Button x:Name="loadFileButton" Content="Load File" HorizontalAlignment="Right" Margin="0,10,10,0" VerticalAlignment="Top" Width="75" RenderTransformOrigin="-0.423,0.379"/>
         <Button x:Name="loadDirButton" Content="Load Dir" HorizontalAlignment="Right" Margin="0,10,90,0" VerticalAlignment="Top" Width="75"/>
