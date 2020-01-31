@@ -216,12 +216,16 @@ Class MainWindow
 
                 While Not CancelWatching.IsCancellationRequested
                     Try
+                        Dim HadEvents = False
                         Dim NewEvent As Func(Of Task) = Nothing
                         While TaskQueue.TryDequeue(NewEvent)
+                            HadEvents = True
                             Await NewEvent()
                         End While
 
-                        Await Me.RefreshQueries(CancelWatching.Token)
+                        If HadEvents Then
+                            Await Me.RefreshQueries(CancelWatching.Token)
+                        End If
 
                         Await Task.Delay(500, CancelWatching.Token)
                     Catch ex As TaskCanceledException
