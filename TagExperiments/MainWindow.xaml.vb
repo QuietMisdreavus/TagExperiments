@@ -126,119 +126,125 @@ Class MainWindow
 #Region "button handlers"
 
     Private Async Sub loadFileButton_Click(sender As Object, e As RoutedEventArgs) Handles loadFileButton.Click
-        Dim pickFile As New WinForms.OpenFileDialog With {
+        Using pickFile As New WinForms.OpenFileDialog With {
             .Filter = "Music files|*.mp3;*.m4a"
         }
-        StatusBarText.Text = "Please select a track."
-        Me.Cursor = Cursors.Wait
-        ToggleButtons(False)
-        If pickFile.ShowDialog() = WinForms.DialogResult.OK Then
-            StatusBarText.Text = "Loading track information..."
+            StatusBarText.Text = "Please select a track."
+            If pickFile.ShowDialog() = WinForms.DialogResult.OK Then
+                Me.Cursor = Cursors.Wait
+                ToggleButtons(False)
+                StatusBarText.Text = "Loading track information..."
 
-            Dim fileName = pickFile.FileName
-            Dim track = Await db.LoadTrackOrUseDisk(fileName)
+                Dim fileName = pickFile.FileName
+                Dim track = Await db.LoadTrackOrUseDisk(fileName)
 
-            trackInfoGrid.ItemsSource = track.AsRows()
+                trackInfoGrid.ItemsSource = track.AsRows()
 
-            Me.Cursor = Cursors.Arrow
-            ToggleButtons(True)
-        End If
+                Me.Cursor = Cursors.Arrow
+                ToggleButtons(True)
+            End If
 
-        StatusBarText.Text = ReadyString
+            StatusBarText.Text = ReadyString
+        End Using
     End Sub
 
     Private Async Sub loadDirButton_Click(sender As Object, e As RoutedEventArgs) Handles loadDirButton.Click
-        Dim pickDir As New WinForms.FolderBrowserDialog
-        StatusBarText.Text = "Please select a directory to display."
-        If pickDir.ShowDialog() = WinForms.DialogResult.OK Then
-            StatusBarText.Text = "Loading track information from directory..."
-            Me.Cursor = Cursors.Wait
-            ToggleButtons(False)
+        Using pickDir As New WinForms.FolderBrowserDialog
+            StatusBarText.Text = "Please select a directory to display."
+            If pickDir.ShowDialog() = WinForms.DialogResult.OK Then
+                StatusBarText.Text = "Loading track information from directory..."
+                Me.Cursor = Cursors.Wait
+                ToggleButtons(False)
 
-            Dim dir = pickDir.SelectedPath
-            Dim showTrack As Track = Nothing
+                Dim dir = pickDir.SelectedPath
+                Dim showTrack As Track = Nothing
 
-            For Each FileName In Directory.EnumerateFiles(dir)
-                If IsMusicFile(FileName) Then
-                    Dim thisTrack = Await db.LoadTrackOrUseDisk(FileName)
-                    If showTrack Is Nothing Then
-                        showTrack = thisTrack
-                    Else
-                        showTrack.CombineWith(thisTrack)
+                For Each FileName In Directory.EnumerateFiles(dir)
+                    If IsMusicFile(FileName) Then
+                        Dim thisTrack = Await db.LoadTrackOrUseDisk(FileName)
+                        If showTrack Is Nothing Then
+                            showTrack = thisTrack
+                        Else
+                            showTrack.CombineWith(thisTrack)
+                        End If
                     End If
+                Next
+
+                If showTrack IsNot Nothing Then
+                    trackInfoGrid.ItemsSource = showTrack.AsRows()
+                    StatusBarText.Text = ReadyString
+                Else
+                    trackInfoGrid.ItemsSource = New List(Of TagRow)
+                    StatusBarText.Text = "No tracks in selected folder."
                 End If
-            Next
 
-            If showTrack IsNot Nothing Then
-                trackInfoGrid.ItemsSource = showTrack.AsRows()
-                StatusBarText.Text = ReadyString
+                Me.Cursor = Cursors.Arrow
+                ToggleButtons(True)
             Else
-                trackInfoGrid.ItemsSource = New List(Of TagRow)
-                StatusBarText.Text = "No tracks in selected folder."
+                StatusBarText.Text = ReadyString
             End If
-
-            Me.Cursor = Cursors.Arrow
-            ToggleButtons(True)
-        Else
-            StatusBarText.Text = ReadyString
-        End If
+        End Using
     End Sub
 
     Private Async Sub ImportDirButton_Click(sender As Object, e As RoutedEventArgs) Handles importDirButton.Click
-        Dim pickDir As New WinForms.FolderBrowserDialog
         StatusBarText.Text = "Please select a directory to import into the database."
-        If pickDir.ShowDialog() = WinForms.DialogResult.OK Then
-            Await Me.ImportDir(pickDir.SelectedPath)
-        Else
-            StatusBarText.Text = ReadyString
-        End If
+        Using pickDir As New WinForms.FolderBrowserDialog
+            If pickDir.ShowDialog() = WinForms.DialogResult.OK Then
+                Await Me.ImportDir(pickDir.SelectedPath)
+            Else
+                StatusBarText.Text = ReadyString
+            End If
+        End Using
     End Sub
 
     Private Async Sub WatchDirButton_Click(sender As Object, e As RoutedEventArgs) Handles WatchDirButton.Click
         WatchDirButton.IsEnabled = False
 
         If LibraryWatcher Is Nothing Then
-            Dim PickDir As New WinForms.FolderBrowserDialog
             StatusBarText.Text = "Please select a directory to import and monitor."
-            If PickDir.ShowDialog() = WinForms.DialogResult.OK Then
-                Await Me.ImportDir(PickDir.SelectedPath)
+            Using PickDir As New WinForms.FolderBrowserDialog
+                If PickDir.ShowDialog() = WinForms.DialogResult.OK Then
+                    Await Me.ImportDir(PickDir.SelectedPath)
 
-                WatchDirButton.Content = "Cancel Watch"
+                    WatchDirButton.IsEnabled = False
 
-                Me.LibraryWatcher = New FileSystemWatcher(PickDir.SelectedPath) With {
-                    .NotifyFilter = NotifyFilters.LastWrite Or NotifyFilters.FileName Or NotifyFilters.DirectoryName Or NotifyFilters.CreationTime,
-                    .IncludeSubdirectories = True,
-                    .EnableRaisingEvents = True
-                }
+                    Me.LibraryWatcher = New FileSystemWatcher(PickDir.SelectedPath) With {
+                        .NotifyFilter = NotifyFilters.LastWrite Or NotifyFilters.FileName Or NotifyFilters.DirectoryName Or NotifyFilters.CreationTime,
+                        .IncludeSubdirectories = True,
+                        .EnableRaisingEvents = True
+                    }
 
-                ReadyString = "Watching library directory."
-                StatusBarText.Text = ReadyString
+                    ReadyString = "Watching library directory."
+                    StatusBarText.Text = ReadyString
 
-                WatchDirButton.IsEnabled = True
+                    WatchDirButton.Content = "Cancel Watch"
+                    WatchDirButton.IsEnabled = True
 
-                While Not CancelWatching.IsCancellationRequested
-                    Try
-                        Dim HadEvents = False
-                        Dim NewEvent As Func(Of Task) = Nothing
-                        While TaskQueue.TryDequeue(NewEvent)
-                            HadEvents = True
-                            Await NewEvent()
-                        End While
+                    While Not CancelWatching.IsCancellationRequested
+                        Try
+                            Dim HadEvents = False
+                            Dim NewEvent As Func(Of Task) = Nothing
+                            While TaskQueue.TryDequeue(NewEvent)
+                                HadEvents = True
+                                Await NewEvent()
+                            End While
 
-                        If HadEvents Then
-                            Await Me.RefreshQueries(CancelWatching.Token)
-                        End If
+                            If HadEvents Then
+                                Await Me.RefreshQueries(CancelWatching.Token)
+                            End If
 
-                        Await Task.Delay(500, CancelWatching.Token)
-                    Catch ex As TaskCanceledException
-                        Exit While
-                    End Try
-                End While
-            Else
-                StatusBarText.Text = ReadyString
-            End If
+                            Await Task.Delay(500, CancelWatching.Token)
+                        Catch ex As TaskCanceledException
+                            Exit While
+                        End Try
+                    End While
+                Else
+                    StatusBarText.Text = ReadyString
+                End If
+            End Using
         Else
             LibraryWatcher.EnableRaisingEvents = False
+            LibraryWatcher.Dispose()
             LibraryWatcher = Nothing
 
             CancelWatching.Cancel()
