@@ -26,11 +26,13 @@ Class MainWindow
 
 #Region "helper methods"
 
-    Private Sub ToggleButtons(ButtonState As Boolean)
-        loadFileButton.IsEnabled = ButtonState
-        loadDirButton.IsEnabled = ButtonState
-        importDirButton.IsEnabled = ButtonState
-        WatchDirButton.IsEnabled = ButtonState
+    Private Sub ToggleMenus(MenuState As Boolean)
+        LoadFileMenu.IsEnabled = MenuState
+        LoadFileIntoDBMenu.IsEnabled = MenuState
+        LoadDirMenu.IsEnabled = MenuState
+        LoadDirIntoDBMenu.IsEnabled = MenuState
+        ImportDirMenu.IsEnabled = MenuState
+        WatchDirMenu.IsEnabled = MenuState
     End Sub
 
     Private Async Function ImportDir(dir As String) As Task
@@ -39,7 +41,7 @@ Class MainWindow
 
         StatusBarText.Text = "Loading tracks from library..."
         Me.Cursor = Cursors.Wait
-        ToggleButtons(False)
+        ToggleMenus(False)
         Await Task.Yield()
 
         Dim TrackFiles = Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
@@ -78,7 +80,7 @@ Class MainWindow
         StatusBarText.Text = CompleteText
 
         Me.Cursor = Cursors.Arrow
-        ToggleButtons(True)
+        ToggleMenus(True)
     End Function
 
     Private Function IsMusicFile(FileName As String) As Boolean
@@ -131,47 +133,43 @@ Class MainWindow
         End If
     End Function
 
-#End Region
-
-#Region "button handlers"
-
-    Private Async Sub loadFileButton_Click(sender As Object, e As RoutedEventArgs) Handles loadFileButton.Click
+    Private Async Function LoadFile(SaveToDB As Boolean) As Task
         Using pickFile As New WinForms.OpenFileDialog With {
-            .Filter = "Music files|*.mp3;*.m4a"
-        }
+                    .Filter = "Music files|*.mp3;*.m4a"
+                }
             StatusBarText.Text = "Please select a track."
             If pickFile.ShowDialog() = WinForms.DialogResult.OK Then
                 Me.Cursor = Cursors.Wait
-                ToggleButtons(False)
+                ToggleMenus(False)
                 StatusBarText.Text = "Loading track information..."
 
                 Dim fileName = pickFile.FileName
-                Dim track = Await db.LoadTrackOrUseDisk(fileName)
+                Dim track = Await db.LoadTrackOrUseDisk(fileName, SaveToDB)
 
                 trackInfoGrid.ItemsSource = track.AsRows()
 
                 Me.Cursor = Cursors.Arrow
-                ToggleButtons(True)
+                ToggleMenus(True)
             End If
 
             StatusBarText.Text = ReadyString
         End Using
-    End Sub
+    End Function
 
-    Private Async Sub loadDirButton_Click(sender As Object, e As RoutedEventArgs) Handles loadDirButton.Click
+    Private Async Function LoadDirectory(SaveToDB As Boolean) As Task
         Using pickDir As New WinForms.FolderBrowserDialog
             StatusBarText.Text = "Please select a directory to display."
             If pickDir.ShowDialog() = WinForms.DialogResult.OK Then
                 StatusBarText.Text = "Loading track information from directory..."
                 Me.Cursor = Cursors.Wait
-                ToggleButtons(False)
+                ToggleMenus(False)
 
                 Dim dir = pickDir.SelectedPath
                 Dim showTrack As Track = Nothing
 
                 For Each FileName In Directory.EnumerateFiles(dir)
                     If IsMusicFile(FileName) Then
-                        Dim thisTrack = Await db.LoadTrackOrUseDisk(FileName)
+                        Dim thisTrack = Await db.LoadTrackOrUseDisk(FileName, SaveToDB)
                         If showTrack Is Nothing Then
                             showTrack = thisTrack
                         Else
@@ -189,14 +187,34 @@ Class MainWindow
                 End If
 
                 Me.Cursor = Cursors.Arrow
-                ToggleButtons(True)
+                ToggleMenus(True)
             Else
                 StatusBarText.Text = ReadyString
             End If
         End Using
+    End Function
+
+#End Region
+
+#Region "button handlers"
+
+    Private Async Sub LoadFileIntoDBMenu_Click(sender As Object, e As RoutedEventArgs) Handles LoadFileIntoDBMenu.Click
+        Await LoadFile(True)
     End Sub
 
-    Private Async Sub ImportDirButton_Click(sender As Object, e As RoutedEventArgs) Handles importDirButton.Click
+    Private Async Sub LoadFileMenu_Click(sender As Object, e As RoutedEventArgs) Handles LoadFileMenu.Click
+        Await LoadFile(False)
+    End Sub
+
+    Private Async Sub LoadDirIntoDBMenu_Click(sender As Object, e As RoutedEventArgs) Handles LoadDirIntoDBMenu.Click
+        Await LoadDirectory(True)
+    End Sub
+
+    Private Async Sub LoadDirMenu_Click(sender As Object, e As RoutedEventArgs) Handles LoadDirMenu.Click
+        Await LoadDirectory(False)
+    End Sub
+
+    Private Async Sub ImportDirMenu_Click(sender As Object, e As RoutedEventArgs) Handles ImportDirMenu.Click
         StatusBarText.Text = "Please select a directory to import into the database."
         Using pickDir As New WinForms.FolderBrowserDialog
             If pickDir.ShowDialog() = WinForms.DialogResult.OK Then
@@ -207,8 +225,8 @@ Class MainWindow
         End Using
     End Sub
 
-    Private Async Sub WatchDirButton_Click(sender As Object, e As RoutedEventArgs) Handles WatchDirButton.Click
-        WatchDirButton.IsEnabled = False
+    Private Async Sub WatchDirMenu_Click(sender As Object, e As RoutedEventArgs) Handles WatchDirMenu.Click
+        WatchDirMenu.IsEnabled = False
 
         If LibraryWatcher Is Nothing Then
             StatusBarText.Text = "Please select a directory to import and monitor."
@@ -216,7 +234,7 @@ Class MainWindow
                 If PickDir.ShowDialog() = WinForms.DialogResult.OK Then
                     Await Me.ImportDir(PickDir.SelectedPath)
 
-                    WatchDirButton.IsEnabled = False
+                    WatchDirMenu.IsEnabled = False
 
                     Me.LibraryWatcher = New FileSystemWatcher(PickDir.SelectedPath) With {
                         .NotifyFilter = NotifyFilters.LastWrite Or NotifyFilters.FileName Or NotifyFilters.DirectoryName Or NotifyFilters.CreationTime,
@@ -227,8 +245,8 @@ Class MainWindow
                     ReadyString = "Watching library directory."
                     StatusBarText.Text = ReadyString
 
-                    WatchDirButton.Content = "Cancel Watch"
-                    WatchDirButton.IsEnabled = True
+                    WatchDirMenu.Header = "Cancel Active Watch"
+                    WatchDirMenu.IsEnabled = True
 
                     While Not CancelWatching.IsCancellationRequested
                         Try
@@ -276,12 +294,12 @@ Class MainWindow
             CancelWatching.Dispose()
             CancelWatching = New CancellationTokenSource
 
-            WatchDirButton.Content = "Watch Dir"
+            WatchDirMenu.Header = "Import and Watch"
 
             ReadyString = "Ready."
             StatusBarText.Text = ReadyString
 
-            WatchDirButton.IsEnabled = True
+            WatchDirMenu.IsEnabled = True
         End If
     End Sub
 
@@ -325,7 +343,7 @@ Class MainWindow
         Me.WindowState = WindowState.Normal
     End Sub
 
-    Private Sub CloseMenu_Click(sender As Object, e As EventArgs) Handles CloseMenu.Click
+    Private Sub CloseMenu_Click(sender As Object, e As EventArgs) Handles CloseMenu.Click, ExitMenuItem.Click
         ManuallyClosing = True
         Me.Close()
     End Sub
