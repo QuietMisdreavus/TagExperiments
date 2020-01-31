@@ -339,6 +339,16 @@ Public NotInheritable Class Database
         End Using
     End Function
 
+    ''' <summary>
+    ''' Returns the list of albums containing tracks that are missing their "total track count" field.
+    ''' Excludes tracks missing both "track number" and "total track count" fields, to exclude collections
+    ''' of singles and similar unstructured albums.
+    ''' </summary>
+    ''' <param name="CancellationToken">
+    ''' A <see cref="CancellationToken"/> to observe while waiting for the operation to complete.
+    ''' Defaults to <see cref="CancellationToken.None"/>.
+    ''' </param>
+    ''' <returns>The list of albums.</returns>
     Public Async Function MissingTrackCount(Optional CancellationToken As CancellationToken = Nothing) As Task(Of List(Of AlbumRow))
         Dim conn = Await DBConn(CancellationToken)
 
