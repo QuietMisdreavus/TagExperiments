@@ -5,6 +5,7 @@ Imports System.Threading
 Imports WinForms = System.Windows.Forms
 
 Class MainWindow
+    Implements IDisposable
 
 #Region "fields"
 
@@ -380,6 +381,38 @@ Class MainWindow
             Await db.RenameTrackFile(OldName, NewName, CancelWatching.Token)
         End If
     End Function
+
+#End Region
+
+#Region "IDisposable Support"
+
+    Private HasBeenDisposed As Boolean ' To detect redundant calls
+
+    ' IDisposable
+    Protected Overridable Sub Dispose(disposing As Boolean)
+        If Not HasBeenDisposed Then
+            If disposing Then
+                db.Dispose()
+                SystrayIcon.Dispose()
+                CloseMenu.Dispose()
+
+                If LibraryWatcher IsNot Nothing Then
+                    LibraryWatcher.Dispose()
+                End If
+
+                If CancelWatching IsNot Nothing Then
+                    CancelWatching.Dispose()
+                End If
+            End If
+        End If
+        HasBeenDisposed = True
+    End Sub
+
+    ' This code added by Visual Basic to correctly implement the disposable pattern.
+    Public Sub Dispose() Implements IDisposable.Dispose
+        ' Do not change this code.  Put cleanup code in Dispose(disposing As Boolean) above.
+        Dispose(True)
+    End Sub
 
 #End Region
 
