@@ -226,7 +226,22 @@ Class MainWindow
                             Dim NewEvent As Func(Of Task) = Nothing
                             While TaskQueue.TryDequeue(NewEvent)
                                 HadEvents = True
-                                Await NewEvent()
+                                Try
+                                    Await NewEvent()
+                                Catch ex As FileNotReadyException
+                                    ' iTunes still has a file lock. try it again later.
+                                    TaskQueue.Enqueue(
+                                        Async Function()
+                                            Await Task.Delay(100, CancelWatching.Token)
+                                            Try
+                                                Await NewEvent()
+                                            Catch SecondEx As FileNotReadyException
+                                                ' rather than retry this again forever, throw the exception out
+                                                Throw New Exception(SecondEx.Message)
+                                            End Try
+                                        End Function
+                                    )
+                                End Try
                             End While
 
                             If HadEvents Then

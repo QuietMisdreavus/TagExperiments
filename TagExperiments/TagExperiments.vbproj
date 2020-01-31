@@ -124,6 +124,7 @@
     </ApplicationDefinition>
     <Compile Include="AlbumRow.vb" />
     <Compile Include="Database.vb" />
+    <Compile Include="FileNotReadyException.vb" />
     <Compile Include="TagRow.vb" />
     <Compile Include="Track.vb" />
     <Page Include="MainWindow.xaml">

@@ -232,14 +232,9 @@ Public NotInheritable Class Database
         Dim DiskTrack = Track.Load(FileName)
 
         If DiskTrack Is Nothing Then
-            ' sometimes, iTunes still has a file lock on the file when we try to load it. wait for a moment and try again.
-            Await Task.Delay(100, CancellationToken)
-            DiskTrack = Track.Load(FileName)
-        End If
-
-        If DiskTrack Is Nothing Then
-            ' if there's still a problem loading the file, write it off. the database might get out of sync, but it's not a big deal.
-            Exit Function
+            ' sometimes, iTunes still has a file lock on the file when we try to load it. throw a special exception
+            ' so the event handler can queue the load for later.
+            Throw New FileNotReadyException($"{FileName} could not be loaded")
         End If
 
         Dim CompareResult = Await CompareTrackToDB(DiskTrack, CancellationToken)
